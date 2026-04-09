@@ -12,8 +12,7 @@ use App\Models\StockMovement;
 use App\Services\InventoryService;
 use BackedEnum;
 use Filament\Actions\Action;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
@@ -47,25 +46,41 @@ class InventoryResource extends BaseResource
         return $schema
             ->components([
                 Select::make('product_variant_id')
-                    ->relationship('productVariant', 'sku')
+                    ->relationship(
+                        'productVariant',
+                        'sku',
+                        fn (Builder $query): Builder => $query
+                            ->with('product')
+                    )
+                    ->getOptionLabelFromRecordUsing(fn (Model $record): string => sprintf(
+                        '%s - %s',
+                        $record->sku,
+                        $record->product?->name ?? 'Unknown product'
+                    ))
                     ->searchable()
                     ->preload()
                     ->disabled(fn (string $operation): bool => $operation === 'edit')
+                    ->helperText('Selecting a variant with an existing inventory record will update that record.')
                     ->required(),
                 TextInput::make('on_hand')
                     ->numeric()
+                    ->minValue(0)
                     ->required(),
                 TextInput::make('reserved')
                     ->numeric()
+                    ->minValue(0)
                     ->required(),
                 TextInput::make('reorder_point')
                     ->numeric()
+                    ->minValue(0)
                     ->required(),
                 TextInput::make('reorder_quantity')
                     ->numeric()
+                    ->minValue(0)
                     ->required(),
                 TextInput::make('safety_stock')
                     ->numeric()
+                    ->minValue(0)
                     ->required(),
             ]);
     }
@@ -162,11 +177,7 @@ class InventoryResource extends BaseResource
                     }),
                 ViewAction::make(),
                 EditAction::make(),
-            ])
-            ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
+                DeleteAction::make(),
             ]);
     }
 
@@ -177,14 +188,10 @@ class InventoryResource extends BaseResource
         ];
     }
 
-    public static function canCreate(): bool
-    {
-        return false;
-    }
-
     public static function canDelete(Model $record): bool
     {
-        return false;
+        return (static::currentUser()?->isAdmin() ?? false)
+            && (! $record->stockMovements()->exists());
     }
 
     public static function canDeleteAny(): bool

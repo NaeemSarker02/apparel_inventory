@@ -52,6 +52,10 @@ class AdminModuleAccessTest extends TestCase
             ->assertOk();
 
         $this->actingAs($manager)
+            ->get('/admin/inventories/create')
+            ->assertOk();
+
+        $this->actingAs($manager)
             ->get('/admin/users')
             ->assertForbidden();
     }
@@ -73,6 +77,10 @@ class AdminModuleAccessTest extends TestCase
 
         $this->actingAs($viewer)
             ->get('/admin/products/create')
+            ->assertForbidden();
+
+        $this->actingAs($viewer)
+            ->get('/admin/inventories/create')
             ->assertForbidden();
     }
 }
